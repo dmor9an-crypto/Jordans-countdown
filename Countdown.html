@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jordan's Countdown</title>
+  <style>
+    :root{
+      --bg:#0b0b10;
+      --card:#141420;
+      --accent:#ffd700; /* gold */
+      --text:#ffffff;
+      --muted:#c9c9d1;
+      --danger:#ff4d4f;
+    }
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: "Comic Sans MS", "Comic Sans", "Trebuchet MS", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #1a1a2e 0%, var(--bg) 65%);
+      color:var(--text);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .wrap{width:min(840px, 98vw); padding: 12px 16px 18px}
+    .banner{
+      background: var(--accent);
+      color:#000;
+      text-align:center;
+      font-weight:800;
+      letter-spacing:.4px;
+      border-radius:10px;
+      padding:10px 14px;
+      box-shadow: 0 6px 22px rgba(255,215,0,.22);
+      font-size: clamp(20px, 3.2vw, 28px);
+    }
+    .grid{display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; margin-top:18px}
+    .tile{
+      background:var(--card);
+      border-radius:14px; padding:16px 10px 14px; text-align:center;
+      border:1px solid rgba(255,255,255,.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .num{ font-size: clamp(38px, 8vw, 96px); font-weight:900; line-height:1; }
+    .label{ color: var(--muted); font-weight:700; letter-spacing: .6px; margin-top:6px; text-transform:uppercase; font-size: clamp(12px, 1.8vw, 14px);}
+
+    .footer{ margin-top: 14px; color: var(--muted); text-align:center; font-size: 14px }
+    .footer strong{color:#fff}
+    .finished{
+      display:none; margin-top:20px; text-align:center; font-weight:900;
+      font-size: clamp(28px, 4.6vw, 42px); color: var(--danger);
+      text-shadow: 0 6px 24px rgba(255,77,79,.35);
+    }
+    @media (max-width: 560px){ .grid{grid-template-columns: repeat(2, 1fr);} }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="banner" id="title">Jordan's Countdown!</div>
+
+    <section class="grid" aria-live="polite" aria-atomic="true">
+      <div class="tile"><div id="days" class="num">–</div><div class="label">Days</div></div>
+      <div class="tile"><div id="hours" class="num">–</div><div class="label">Hours</div></div>
+      <div class="tile"><div id="mins" class="num">–</div><div class="label">Minutes</div></div>
+      <div class="tile"><div id="secs" class="num">–</div><div class="label">Seconds</div></div>
+    </section>
+
+    <div class="finished" id="finished">FINISHED! 🎉</div>
+
+    <p class="footer">
+      Ends <strong id="endText">Friday, 23 January 2026, 5:00 pm</strong> <span id="tz">(London time)</span>
+    </p>
+  </main>
+
+  <script>
+    (function(){
+      // ---- Configuration ----
+      // Default end time: 2026-01-23 17:00:00 London time (which is UTC in January)
+      const DEFAULT_ISO_UTC = '2026-01-23T17:00:00Z';
+      const DEFAULT_TITLE = "Jordan's Countdown!";
+      const DEFAULT_TZ = 'Europe/London';
+
+      // Read query string overrides: ?end=2026-01-23T17:00:00Z&title=Something&tz=Europe/London
+      const params = new URLSearchParams(window.location.search);
+      const isoEnd = params.get('end') || DEFAULT_ISO_UTC;
+      const title = params.get('title') || DEFAULT_TITLE;
+      const tz = params.get('tz') || DEFAULT_TZ;
+
+      // Elements
+      const el = {
+        d: document.getElementById('days'),
+        h: document.getElementById('hours'),
+        m: document.getElementById('mins'),
+        s: document.getElementById('secs'),
+        title: document.getElementById('title'),
+        endText: document.getElementById('endText'),
+        finished: document.getElementById('finished'),
+        tz: document.getElementById('tz')
+      };
+
+      // Apply title
+      el.title.textContent = title;
+
+      // Parse end time as UTC
+      const end = new Date(isoEnd);
+      if (isNaN(end.getTime())) {
+        console.error('Invalid end date supplied:', isoEnd);
+      }
+
+      // Render the readable end time (in London time by default)
+      try {
+        const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz };
+        el.endText.textContent = new Intl.DateTimeFormat('en-GB', opts).format(end);
+        el.tz.textContent = `(${tz === 'Europe/London' ? 'London time' : tz})`;
+      } catch (e) {
+        // Fallback if timezone isn't supported
+        el.endText.textContent = end.toUTCString();
+        el.tz.textContent = '(UTC)';
+      }
+
+      function pad(n){ return String(n).padStart(2,'0'); }
+
+      function tick(){
+        const now = new Date();
+        const diff = end.getTime() - now.getTime();
+        if (diff <= 0) {
+          el.d.textContent = '00';
+          el.h.textContent = '00';
+          el.m.textContent = '00';
+          el.s.textContent = '00';
+          el.finished.style.display = 'block';
+          return; // stop updating
+        }
+        const totalSeconds = Math.floor(diff/1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+
+        el.d.textContent = String(days).padStart(2,'0');
+        el.h.textContent = pad(hours);
+        el.m.textContent = pad(mins);
+        el.s.textContent = pad(secs);
+
+        // Keep going
+        window.requestAnimationFrame(() => setTimeout(tick, 1000 - (Date.now()%1000)));
+      }
+
+      tick();
+    })();
+  </script>
+</body>
+</html>
